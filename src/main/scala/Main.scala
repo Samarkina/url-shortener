@@ -4,6 +4,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import scala.io.StdIn
+import com.redis._
 
 
 object Main {
@@ -12,6 +13,9 @@ object Main {
     // needed for the future flatMap/onComplete in the end
     implicit val executionContext = system.executionContext
 
+    // redis client
+    val redisClient = new RedisClient("localhost", 6379)
+
     val route =
       path("hello") {
         get {
@@ -19,6 +23,8 @@ object Main {
             val defaultShortCodeServiceObject = new DefaultShortCodeService
             val urlShort = defaultShortCodeServiceObject.create(url)
             extractUri { uri =>
+              // push
+              redisClient.set(s"$urlShort", s"$url")
               complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$urlShort")
             }
           }
@@ -29,7 +35,8 @@ object Main {
       pathPrefix("hello") {
         concat(
           path(IntNumber) { url =>
-            val originalUrl = "https://leetcode.com/problems/valid-parentheses/"
+            // get
+            val originalUrl = Uri(redisClient.get(s"$url").get)
             extractUri { uri =>
               complete(HttpResponse(
                 status = StatusCodes.PermanentRedirect,

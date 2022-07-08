@@ -9,8 +9,12 @@ lazy val root = (project in file("."))
 
 val AkkaVersion = "2.6.8"
 val AkkaHttpVersion = "10.2.9"
+val RedisClientVersion = "3.41"
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
   "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
-  "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion
+  "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
+  "net.debasishg" %% "redisclient" % RedisClientVersion
 )
+
+//libraryDependencies += "redis.clients" % "jedis" % "2.0.0"

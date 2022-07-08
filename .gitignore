@@ -56,3 +56,6 @@ jitwatch.out
 project/**/metals.sbt
 
 .bsp
+
+# redis
+dump.rdb
