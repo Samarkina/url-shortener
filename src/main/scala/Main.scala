@@ -19,22 +19,24 @@ object Main extends App with RedisConfig with HttpConfig {
     implicit val executionContext = system.executionContext
 
     // redis client
-    val redisClient = new RedisClient(redisHost, redisPort)
+//    val redisClient = new RedisClient(redisHost, redisPort)
+    val redisService = RedisService(new RedisClient(redisHost, redisPort))
+    val urlShortenerService = UrlShortenerService(redisService)
 
     val shortRoute =
       path("hello") {
         get {
           parameters("url") { url =>
             // check value in Redis
-            val encodedShortUrlSuffix = RedisService.getEncodedDataFromRedis(url, redisClient, "url")
+            val encodedShortUrlSuffix = redisService.getValue(url, "url")
 
             if (encodedShortUrlSuffix.isEmpty) {
               // create a new urlShort
-              UrlShortnerService.createNewShortUrlSuffix(url, redisClient)
+              urlShortenerService.createNewShortUrlSuffix(url)
             }
             else {
               // use existing urlShort
-              UrlShortnerService.useExistingShortUrlSuffix(encodedShortUrlSuffix)
+              urlShortenerService.useExistingShortUrlSuffix(encodedShortUrlSuffix)
             }
           }
         }
@@ -44,7 +46,7 @@ object Main extends App with RedisConfig with HttpConfig {
       pathPrefix("hello") {
         concat(
           path(IntNumber) { shortUrlSuffix =>
-            val encodedLongUrl = RedisService.getEncodedDataFromRedis(shortUrlSuffix.toString, redisClient, "urlShort")
+            val encodedLongUrl = redisService.getValue(shortUrlSuffix.toString, "urlShort")
             val decodedLongUrl = Uri(Coder.decodeData(encodedLongUrl))
 
             extractUri { uri =>
@@ -72,7 +74,7 @@ object Main extends App with RedisConfig with HttpConfig {
             |</body>
             |</html>""".stripMargin
 
-        UrlShortnerService.createHTMLPage(content)
+        urlShortenerService.createHTMLPage(content)
       }
 
     val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(shortRoute ~ getRoute ~ fieldRoute)

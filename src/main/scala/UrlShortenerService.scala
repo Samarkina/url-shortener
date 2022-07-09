@@ -7,19 +7,19 @@ import com.redis.RedisClient
 import scala.concurrent.Future
 import scala.math.abs
 
-object UrlShortnerService {
+case class UrlShortenerService(redisService: RedisService) {
   def createHash(data: String): String = {
     s"${abs(data.hashCode()).toString}"
   }
 
-  def createNewShortUrlSuffix(url: String, redisClient: RedisClient): RequestContext => Future[RouteResult] = {
+  def createNewShortUrlSuffix(url: String): RequestContext => Future[RouteResult] = {
     {
       // create a new shortUrlSuffix
       val shortUrlSuffix = createHash(url)
 
       extractUri { uri =>
-        RedisService.setDataToRedis(shortUrlSuffix, redisClient, EXPIRE_REDIS_TIME, "urlShort")
-        RedisService.setDataToRedis(url, redisClient, EXPIRE_REDIS_TIME, "url")
+        redisService.setValue(key=shortUrlSuffix, value=url, "urlShort")
+        redisService.setValue(key=url, value=shortUrlSuffix, "url")
         val link = s"${uri.scheme}://${uri.authority}${uri.path}/$shortUrlSuffix"
 
         createHTMLLinkPage(link)
