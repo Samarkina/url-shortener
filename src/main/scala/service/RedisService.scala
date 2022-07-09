@@ -3,7 +3,10 @@ package service
 import com.redis.RedisClient
 import util.Coder
 
+import scala.concurrent.duration.DurationInt
+
 case class RedisService(redisClient: RedisClient) {
+  val EXPIRE_REDIS_TIME = 30.minutes
 
   def setValue(key: String, value: String, keyPrefix: String): Unit = {
     val encodedKey = Coder.encodeData(key)

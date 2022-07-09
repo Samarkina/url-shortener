@@ -1,3 +1,5 @@
+package route
+
 import com.typesafe.config
 import com.typesafe.config.ConfigFactory
 
