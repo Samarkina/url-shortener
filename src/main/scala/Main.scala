@@ -10,16 +10,16 @@ import com.redis._
 import scala.concurrent.duration.DurationInt
 
 
-object Main {
+object Main extends App with RedisConfig with HttpConfig {
   val EXPIRE_REDIS_TIME = 30.minutes
 
-  def main(args: Array[String]): Unit = {
+  def main(): Unit = {
     implicit val system = ActorSystem(Behaviors.empty, "my-system")
     // needed for the future flatMap/onComplete in the end
     implicit val executionContext = system.executionContext
 
     // redis client
-    val redisClient = new RedisClient("localhost", 6379)
+    val redisClient = new RedisClient(redisHost, redisPort)
 
     val route =
       path("hello") {
@@ -69,7 +69,7 @@ object Main {
         )
       }
 
-    val bindingFuture = Http().newServerAt("localhost", 8080).bind(route ~ route2)
+    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(route ~ route2)
 
     println(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return
@@ -78,4 +78,5 @@ object Main {
       .onComplete(_ => system.terminate()) // and shutdown when done
 
   }
+  main()
 }
