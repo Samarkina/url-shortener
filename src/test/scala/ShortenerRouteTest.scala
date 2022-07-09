@@ -1,13 +1,12 @@
-import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.TestKit
 import com.github.sebruck.EmbeddedRedis
 import com.redis.RedisClient
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.{AnyWordSpec, AnyWordSpecLike}
+import org.scalatest.wordspec.AnyWordSpec
 import route.ShortenerRoute
 import service.{RedisService, UrlShortenerService}
 

@@ -1,16 +1,12 @@
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 
 import scala.io.StdIn
 import com.redis._
 import route.{ShortenerRoute, HttpConfig, MainPageRoute, RedisConfig}
 import service.{RedisService, UrlShortenerService}
-import util.{Coder, HtmlTemplates}
-
-import scala.concurrent.duration.DurationInt
 
 
 object Main extends App with RedisConfig with HttpConfig {
