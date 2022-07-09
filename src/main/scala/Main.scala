@@ -35,14 +35,42 @@ object Main extends App with RedisConfig with HttpConfig {
               extractUri { uri =>
                 RedisService.setDataToRedis(urlShort, redisClient, EXPIRE_REDIS_TIME, "urlShort")
                 RedisService.setDataToRedis(url, redisClient, EXPIRE_REDIS_TIME, "url")
-                complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$urlShort")
+                val link = s"${uri.scheme}://${uri.authority}${uri.path}/$urlShort"
+
+                val content = s"""<html>
+                                |<body>
+                                |<form action="/hello" method="GET">
+                                |    <p>Your short URL version is <a href=\"$link\">$link</a></p>
+                                |</form>
+                                |</body>
+                                |</html>""".stripMargin
+                complete(
+                  HttpEntity(
+                    ContentTypes.`text/html(UTF-8)`,
+                    content
+                  )
+                )
               }
             }
             else {
               // use existing urlShort
               val decodedUrlShort = Coder.decodeData(encodedShortUrlSuffix)
               extractUri { uri =>
-                complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$decodedUrlShort")
+                val link = s"${uri.scheme}://${uri.authority}${uri.path}/$decodedUrlShort"
+
+                lazy val content = s"""<html>
+                                |<body>
+                                |<form action="/hello" method="GET">
+                                |    <p>Your short URL version is <a href=\"$link\">$link</a></p>
+                                |</form>
+                                |</body>
+                                |</html>""".stripMargin
+                complete(
+                  HttpEntity(
+                    ContentTypes.`text/html(UTF-8)`,
+                    content
+                  )
+                )
               }
             }
           }
@@ -69,9 +97,27 @@ object Main extends App with RedisConfig with HttpConfig {
         )
       }
 
-    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(route ~ route2)
+    val routeField =
+      pathEndOrSingleSlash {
+        val content = """<html>
+                        |<body>
+                        |<form action="/hello" method="GET">
+                        |    <p>Please enter some text below:</p>
+                        |    <input type="text" name="url">
+                        |</form>
+                        |</body>
+                        |</html>""".stripMargin
+        complete(
+          HttpEntity(
+          ContentTypes.`text/html(UTF-8)`,
+          content
+          )
+        )
+      }
 
-    println(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop...")
+    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(route ~ route2 ~ routeField)
+
+    println(s"Server now online. Please navigate to http://localhost:8080/\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return
     bindingFuture
       .flatMap(_.unbind()) // trigger unbinding from the port
