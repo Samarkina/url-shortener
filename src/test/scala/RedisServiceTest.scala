@@ -2,6 +2,7 @@ import akka.actor.ActorSystem
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 import com.github.sebruck.EmbeddedRedis
 import com.redis.RedisClient
+import service.RedisService
 
 
 class RedisServiceTest extends WordSpec with Matchers with EmbeddedRedis with BeforeAndAfterAll {
@@ -40,7 +41,7 @@ class RedisServiceTest extends WordSpec with Matchers with EmbeddedRedis with Be
         val value = "https://leetcode.com/problems/valid-parentheses/"
 
         val redisClient = new RedisClient(host = "localhost", port = port)
-        val redisDataStore = RedisService(redisClient)
+        val redisDataStore = service.RedisService(redisClient)
 
         // actual
         redisClient.set(key=s"urlShort:$encodedKey", value=value)

@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.Directives._
 
 import scala.io.StdIn
 import com.redis._
+import service.{RedisService, UrlShortenerService}
 import util.{Coder, HtmlTemplates}
 
 import scala.concurrent.duration.DurationInt
