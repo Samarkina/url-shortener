@@ -21,7 +21,7 @@ object Main extends App with RedisConfig with HttpConfig {
     // redis client
     val redisClient = new RedisClient(redisHost, redisPort)
 
-    val route =
+    val shortRoute =
       path("hello") {
         get {
           parameters("url") { url =>
@@ -30,64 +30,27 @@ object Main extends App with RedisConfig with HttpConfig {
 
             if (encodedShortUrlSuffix.isEmpty) {
               // create a new urlShort
-              val urlShort = UrlShortnerService.hashCreate(url)
-
-              extractUri { uri =>
-                RedisService.setDataToRedis(urlShort, redisClient, EXPIRE_REDIS_TIME, "urlShort")
-                RedisService.setDataToRedis(url, redisClient, EXPIRE_REDIS_TIME, "url")
-                val link = s"${uri.scheme}://${uri.authority}${uri.path}/$urlShort"
-
-                val content = s"""<html>
-                                |<body>
-                                |<form action="/hello" method="GET">
-                                |    <p>Your short URL version is <a href=\"$link\">$link</a></p>
-                                |</form>
-                                |</body>
-                                |</html>""".stripMargin
-                complete(
-                  HttpEntity(
-                    ContentTypes.`text/html(UTF-8)`,
-                    content
-                  )
-                )
-              }
+              UrlShortnerService.createNewShortUrlSuffix(url, redisClient)
             }
             else {
               // use existing urlShort
-              val decodedUrlShort = Coder.decodeData(encodedShortUrlSuffix)
-              extractUri { uri =>
-                val link = s"${uri.scheme}://${uri.authority}${uri.path}/$decodedUrlShort"
-
-                lazy val content = s"""<html>
-                                |<body>
-                                |<form action="/hello" method="GET">
-                                |    <p>Your short URL version is <a href=\"$link\">$link</a></p>
-                                |</form>
-                                |</body>
-                                |</html>""".stripMargin
-                complete(
-                  HttpEntity(
-                    ContentTypes.`text/html(UTF-8)`,
-                    content
-                  )
-                )
-              }
+              UrlShortnerService.useExistingShortUrlSuffix(encodedShortUrlSuffix)
             }
           }
         }
       }
 
-    val route2 =
+    val getRoute =
       pathPrefix("hello") {
         concat(
           path(IntNumber) { shortUrlSuffix =>
-            val encodedRedisUrlLong = RedisService.getEncodedDataFromRedis(shortUrlSuffix.toString, redisClient, "urlShort")
-            val decodedRedisUrlLong = Uri(Coder.decodeData(encodedRedisUrlLong))
+            val encodedLongUrl = RedisService.getEncodedDataFromRedis(shortUrlSuffix.toString, redisClient, "urlShort")
+            val decodedLongUrl = Uri(Coder.decodeData(encodedLongUrl))
 
             extractUri { uri =>
               complete(HttpResponse(
                 status = StatusCodes.PermanentRedirect,
-                headers = headers.Location(decodedRedisUrlLong) :: Nil,
+                headers = headers.Location(decodedLongUrl) :: Nil,
                 entity = StatusCodes.PermanentRedirect.htmlTemplate match {
                   case ""       => HttpEntity.Empty
                   case template => HttpEntity(ContentTypes.`text/html(UTF-8)`, template format uri)
@@ -97,25 +60,22 @@ object Main extends App with RedisConfig with HttpConfig {
         )
       }
 
-    val routeField =
+    val fieldRoute =
       pathEndOrSingleSlash {
-        val content = """<html>
-                        |<body>
-                        |<form action="/hello" method="GET">
-                        |    <p>Please enter some text below:</p>
-                        |    <input type="text" name="url">
-                        |</form>
-                        |</body>
-                        |</html>""".stripMargin
-        complete(
-          HttpEntity(
-          ContentTypes.`text/html(UTF-8)`,
-          content
-          )
-        )
+        val content =
+          """<html>
+            |<body>
+            |<form action="/hello" method="GET">
+            |    <p>Please enter some text below:</p>
+            |    <input type="text" name="url">
+            |</form>
+            |</body>
+            |</html>""".stripMargin
+
+        UrlShortnerService.createHTMLPage(content)
       }
 
-    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(route ~ route2 ~ routeField)
+    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(shortRoute ~ getRoute ~ fieldRoute)
 
     println(s"Server now online. Please navigate to http://localhost:8080/\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return

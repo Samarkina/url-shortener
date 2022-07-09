@@ -10,8 +10,6 @@ object RedisService {
 
   def getEncodedDataFromRedis(key: String, redisClient: RedisClient, keyPrefix: String): Option[String] = {
     val encodedUrl = Coder.encodeData(key)
-
-    // get long url from Redis
     redisClient.get(s"$keyPrefix:$encodedUrl")
   }
 

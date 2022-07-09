@@ -3,7 +3,6 @@ import java.util.Base64
 
 object Coder {
   def encodeData(data: String): String = {
-    // encoding only short part of url (suffix)
     Base64.getEncoder.encodeToString(data.getBytes(StandardCharsets.UTF_8))
   }
 
