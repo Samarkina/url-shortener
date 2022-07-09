@@ -1,4 +1,3 @@
-import Main.EXPIRE_REDIS_TIME
 import akka.actor.ActorSystem
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 import com.github.sebruck.EmbeddedRedis

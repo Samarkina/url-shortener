@@ -1,13 +1,14 @@
+# URL Shortener
+This project supposes a link shortener using Redis Database.
 
-
-### How to install redis:
+### How to install Redis:
 ```
 brew install redis
 ```
 
 Starting and stopping Redis in the foreground
 
-To **test** your Redis installation, you can run the redis-server executable from the command line:
+To test your Redis installation, you can run the redis-server executable from the command line:
 ```
 redis-server
 ```

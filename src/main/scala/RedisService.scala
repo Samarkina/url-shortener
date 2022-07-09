@@ -1,7 +1,6 @@
 import Main.EXPIRE_REDIS_TIME
 import com.redis.RedisClient
-
-import scala.concurrent.duration.Duration
+import util.Coder
 
 case class RedisService(redisClient: RedisClient) {
 

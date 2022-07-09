@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.Directives._
 
 import scala.io.StdIn
 import com.redis._
+import util.{Coder, HtmlTemplates}
 
 import scala.concurrent.duration.DurationInt
 
@@ -19,7 +20,6 @@ object Main extends App with RedisConfig with HttpConfig {
     implicit val executionContext = system.executionContext
 
     // redis client
-//    val redisClient = new RedisClient(redisHost, redisPort)
     val redisService = RedisService(new RedisClient(redisHost, redisPort))
     val urlShortenerService = UrlShortenerService(redisService)
 
@@ -30,13 +30,17 @@ object Main extends App with RedisConfig with HttpConfig {
             // check value in Redis
             val encodedShortUrlSuffix = redisService.getValue(url, "url")
 
-            if (encodedShortUrlSuffix.isEmpty) {
-              // create a new urlShort
-              urlShortenerService.createNewShortUrlSuffix(url)
-            }
-            else {
-              // use existing urlShort
-              urlShortenerService.useExistingShortUrlSuffix(encodedShortUrlSuffix)
+            extractUri { uri =>
+              encodedShortUrlSuffix match {
+                case None =>
+                  // create a new shortUrlSuffix
+                  val link = urlShortenerService.createNewShortUrl(url, uri)
+                  complete(HtmlTemplates.createResultLinkPage(link))
+                case Some(value) =>
+                  // use existing shortUrlSuffix
+                  val link = urlShortenerService.useExistingShortUrl(value, uri)
+                  complete(HtmlTemplates.createResultLinkPage(link))
+              }
             }
           }
         }
@@ -46,13 +50,12 @@ object Main extends App with RedisConfig with HttpConfig {
       pathPrefix("hello") {
         concat(
           path(IntNumber) { shortUrlSuffix =>
-            val encodedLongUrl = redisService.getValue(shortUrlSuffix.toString, "urlShort")
-            val decodedLongUrl = Uri(Coder.decodeData(encodedLongUrl))
+            val longUrl = Uri(redisService.getValue(shortUrlSuffix.toString, "urlShort").get)
 
             extractUri { uri =>
               complete(HttpResponse(
                 status = StatusCodes.PermanentRedirect,
-                headers = headers.Location(decodedLongUrl) :: Nil,
+                headers = headers.Location(longUrl) :: Nil,
                 entity = StatusCodes.PermanentRedirect.htmlTemplate match {
                   case ""       => HttpEntity.Empty
                   case template => HttpEntity(ContentTypes.`text/html(UTF-8)`, template format uri)
@@ -64,17 +67,7 @@ object Main extends App with RedisConfig with HttpConfig {
 
     val fieldRoute =
       pathEndOrSingleSlash {
-        val content =
-          """<html>
-            |<body>
-            |<form action="/hello" method="GET">
-            |    <p>Please enter some text below:</p>
-            |    <input type="text" name="url">
-            |</form>
-            |</body>
-            |</html>""".stripMargin
-
-        urlShortenerService.createHTMLPage(content)
+        complete(HtmlTemplates.createMainPage())
       }
 
     val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(shortRoute ~ getRoute ~ fieldRoute)
