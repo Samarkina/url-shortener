@@ -3,13 +3,16 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
+
 import scala.io.StdIn
 import com.redis._
-import java.util.Base64
-import java.nio.charset.StandardCharsets
+
+import scala.concurrent.duration.DurationInt
 
 
 object Main {
+  val EXPIRE_REDIS_TIME = 30.minutes
+
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem(Behaviors.empty, "my-system")
     // needed for the future flatMap/onComplete in the end
@@ -23,32 +26,23 @@ object Main {
         get {
           parameters("url") { url =>
             // check value in Redis
-            val encodedRedisUrlShort = redisClient.get(s"url:$url")
+            val encodedShortUrlSuffix = RedisService.getEncodedDataFromRedis(url, redisClient, "url")
 
-            if (encodedRedisUrlShort.isEmpty) {
+            if (encodedShortUrlSuffix.isEmpty) {
               // create a new urlShort
-              val defaultShortCodeServiceObject = new DefaultShortCodeService
-              val urlShort = defaultShortCodeServiceObject.create(url)
+              val urlShort = UrlShortnerService.hashCreate(url)
 
               extractUri { uri =>
-                // encoding only short part of url (suffix)
-                val base64fullUrlShortPath = Base64.getEncoder.encodeToString(urlShort.getBytes(StandardCharsets.UTF_8))
-                val base64url = Base64.getEncoder.encodeToString(url.getBytes(StandardCharsets.UTF_8))
-
-                // push urlShort to Redis
-                redisClient.set(s"urlShort:$base64fullUrlShortPath", s"$base64url")
-                redisClient.set(s"url:$base64url", s"$base64fullUrlShortPath")
-
+                RedisService.setDataToRedis(urlShort, redisClient, EXPIRE_REDIS_TIME, "urlShort")
+                RedisService.setDataToRedis(url, redisClient, EXPIRE_REDIS_TIME, "url")
                 complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$urlShort")
               }
             }
             else {
               // use existing urlShort
-              val decodedArray = Base64.getDecoder.decode(encodedRedisUrlShort.get)
-              val decodedRedisUrlShort = new String(decodedArray, StandardCharsets.UTF_8)
-
+              val decodedUrlShort = Coder.decodeData(encodedShortUrlSuffix)
               extractUri { uri =>
-                complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$decodedRedisUrlShort")
+                complete(s"Your short URL version is ${uri.scheme}://${uri.authority}${uri.path}/$decodedUrlShort")
               }
             }
           }
@@ -58,20 +52,14 @@ object Main {
     val route2 =
       pathPrefix("hello") {
         concat(
-          path(IntNumber) { shortUrl =>
-            val encodedUrl = Base64.getEncoder.encodeToString(shortUrl.toString.getBytes(StandardCharsets.UTF_8))
-
-            // get long url from Redis
-            val encodedRedisUrlLong = redisClient.get(s"urlShort:$encodedUrl")
-
-            val decodedArray = Base64.getDecoder.decode(encodedRedisUrlLong.get)
-            val decodedRedisUrlShort = new String(decodedArray, StandardCharsets.UTF_8)
-            val originalUrl = Uri(decodedRedisUrlShort)
+          path(IntNumber) { shortUrlSuffix =>
+            val encodedRedisUrlLong = RedisService.getEncodedDataFromRedis(shortUrlSuffix.toString, redisClient, "urlShort")
+            val decodedRedisUrlLong = Uri(Coder.decodeData(encodedRedisUrlLong))
 
             extractUri { uri =>
               complete(HttpResponse(
                 status = StatusCodes.PermanentRedirect,
-                headers = headers.Location(originalUrl) :: Nil,
+                headers = headers.Location(decodedRedisUrlLong) :: Nil,
                 entity = StatusCodes.PermanentRedirect.htmlTemplate match {
                   case ""       => HttpEntity.Empty
                   case template => HttpEntity(ContentTypes.`text/html(UTF-8)`, template format uri)
