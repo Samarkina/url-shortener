@@ -23,54 +23,52 @@ object Main extends App with RedisConfig with HttpConfig {
     val redisService = RedisService(new RedisClient(redisHost, redisPort))
     val urlShortenerService = UrlShortenerService(redisService)
 
-    val shortRoute =
-      path("hello") {
-        get {
-          parameters("url") { url =>
-            // check value in Redis
-            val encodedShortUrlSuffix = redisService.getValue(url, "url")
-
-            extractUri { uri =>
-              encodedShortUrlSuffix match {
-                case None =>
-                  // create a new shortUrlSuffix
-                  val link = urlShortenerService.createNewShortUrl(url, uri)
+    val shortenerRoute =
+      pathPrefix("shortener") {
+        concat(
+          get {
+            parameters("url") { url =>
+              extractUri { uri =>
+                try {
+                  // check value in Redis
+                  val encodedShortUrlSuffix = redisService.getValue(url, "url")
+                  val link = urlShortenerService.useExistingShortUrl(encodedShortUrlSuffix, uri)
                   complete(HtmlTemplates.createResultLinkPage(link))
-                case Some(value) =>
-                  // use existing shortUrlSuffix
-                  val link = urlShortenerService.useExistingShortUrl(value, uri)
-                  complete(HtmlTemplates.createResultLinkPage(link))
+                } catch {
+                  case e: IllegalArgumentException =>
+                    val link = urlShortenerService.createNewShortUrl(url, uri)
+                    complete(HtmlTemplates.createResultLinkPage(link))
+                }
               }
             }
-          }
-        }
-      }
-
-    val getRoute =
-      pathPrefix("hello") {
-        concat(
+          },
           path(IntNumber) { shortUrlSuffix =>
-            val longUrl = Uri(redisService.getValue(shortUrlSuffix.toString, "urlShort").get)
-
             extractUri { uri =>
-              complete(HttpResponse(
-                status = StatusCodes.PermanentRedirect,
-                headers = headers.Location(longUrl) :: Nil,
-                entity = StatusCodes.PermanentRedirect.htmlTemplate match {
-                  case ""       => HttpEntity.Empty
-                  case template => HttpEntity(ContentTypes.`text/html(UTF-8)`, template format uri)
-                }))
+              try {
+                val longUrl = redisService.getValue(shortUrlSuffix.toString, "urlShort")
+                complete(HttpResponse(
+                  status = StatusCodes.PermanentRedirect,
+                  headers = headers.Location(longUrl) :: Nil,
+                  entity = StatusCodes.PermanentRedirect.htmlTemplate match {
+                    case "" => HttpEntity.Empty
+                    case template => HttpEntity(ContentTypes.`text/html(UTF-8)`, template format uri)
+                  }))
+              } catch {
+                case e: IllegalArgumentException => complete(HttpResponse(
+                  status = StatusCodes.NotFound,
+                  entity = HtmlTemplates.createNotFoundPage(e.getMessage)))
+              }
             }
           }
         )
       }
 
-    val fieldRoute =
+    val mainPageRoute =
       pathEndOrSingleSlash {
         complete(HtmlTemplates.createMainPage())
       }
 
-    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(shortRoute ~ getRoute ~ fieldRoute)
+    val bindingFuture = Http().newServerAt(httpHost, httpPort).bind(shortenerRoute ~ mainPageRoute)
 
     println(s"Server now online. Please navigate to http://localhost:8080/\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return
@@ -79,5 +77,6 @@ object Main extends App with RedisConfig with HttpConfig {
       .onComplete(_ => system.terminate()) // and shutdown when done
 
   }
+
   main()
 }
