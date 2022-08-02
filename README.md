@@ -1,5 +1,7 @@
 # URL Shortener
-This project supposes a link shortener using Redis Database.
+Link shortener website using Redis database. 
+
+In order to use this service you need to install Redis and run `src/main/scala/Main.scala` file.
 
 ### How to install Redis:
 ```
